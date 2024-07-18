@@ -12,6 +12,7 @@ import (
 )
 
 type arguments struct {
+	oneColumn  bool
 	showHidden bool
 	hasQuotes  bool
 }
@@ -19,6 +20,7 @@ type arguments struct {
 func main() {
 	a := arguments{}
 	flag.BoolFlag("a", &a.showHidden)
+	flag.BoolFlag("1", &a.oneColumn)
 	_ = flag.Parse()
 	args := flag.Args
 

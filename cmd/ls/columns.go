@@ -45,7 +45,9 @@ func (a *arguments) calculateColumns(files []os.DirEntry) (int, []colInfo) {
 	}
 
 	var maxCols int
-	if maxPossible > 0 && maxPossible < len(files) {
+	if a.oneColumn {
+		maxCols = 1
+	} else if maxPossible > 0 && maxPossible < len(files) {
 		maxCols = maxPossible
 	} else {
 		maxCols = lenFiles
@@ -54,7 +56,7 @@ func (a *arguments) calculateColumns(files []os.DirEntry) (int, []colInfo) {
 	cols := newColInfo(maxCols)
 
 	for f, file := range files {
-		nameLen := a.getModdedNameLen(file) + 1
+		nameLen := a.getModdedNameLen(file)
 
 		for i := 0; i < maxCols; i++ {
 			if cols[i].validLength {
