@@ -13,7 +13,7 @@ func (a *arguments) getModdedName(f os.DirEntry) string {
 		if !a.hasQuotes {
 			a.hasQuotes = true
 		}
-		name = fmt.Sprintf("\b\"%s\"", name)
+		name = fmt.Sprintf("\b'%s'", name)
 	}
 
 	return name

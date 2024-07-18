@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"os"
+	"time"
 
 	"github.com/queueue0/qoreutils/internal/terminal"
 )
@@ -83,4 +85,18 @@ func (a *arguments) calculateColumns(files []os.DirEntry) (int, []colInfo) {
 	}
 
 	return numCols, cols
+}
+
+func formatDate(t time.Time) string {
+	currentYear := time.Now().Year()
+
+	formatString := "Jan _2"
+
+	if t.Year() != currentYear {
+		formatString = fmt.Sprintf("%s  2006", formatString)
+	} else {
+		formatString = fmt.Sprintf("%s 15:04", formatString)
+	}
+
+	return t.Format(formatString)
 }

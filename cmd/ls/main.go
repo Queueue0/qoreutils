@@ -4,25 +4,36 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"os/user"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/queueue0/qoreutils/internal/flag"
 )
 
 type arguments struct {
-	oneColumn  bool
-	showHidden bool
-	hasQuotes  bool
+	oneColumn     bool
+	longList      bool
+	showAll       bool
+	showAlmostAll bool
+	hasQuotes     bool
 }
 
 func main() {
 	a := arguments{}
-	flag.BoolFlag("a", &a.showHidden)
+	flag.BoolFlag("a", &a.showAll)
+	flag.BoolFlag("A", &a.showAlmostAll)
 	flag.BoolFlag("1", &a.oneColumn)
+	flag.BoolFlag("l", &a.longList)
 	_ = flag.Parse()
 	args := flag.Args
+
+	if a.showAlmostAll && !a.showAll {
+		a.showAll = true
+	}
 
 	var files []os.DirEntry
 	var err error
@@ -45,20 +56,22 @@ func main() {
 		}
 	}
 
-	cwdfi, err := os.Lstat(".")
-	if err == nil {
-		cwdde := fs.FileInfoToDirEntry(cwdfi)
-		files = append(files, cwdde)
-	}
+	if a.showAll && !a.showAlmostAll {
+		cwdfi, err := os.Lstat(".")
+		if err == nil {
+			cwdde := fs.FileInfoToDirEntry(cwdfi)
+			files = append(files, cwdde)
+		}
 
-	parentfi, err := os.Lstat("..")
-	if err == nil {
-		files = append(files, fs.FileInfoToDirEntry(parentfi))
+		parentfi, err := os.Lstat("..")
+		if err == nil {
+			files = append(files, fs.FileInfoToDirEntry(parentfi))
+		}
 	}
 
 	tmp := []os.DirEntry{}
 	for _, file := range files {
-		if a.showHidden || !strings.HasPrefix(file.Name(), ".") {
+		if a.showAll || !strings.HasPrefix(file.Name(), ".") {
 			tmp = append(tmp, file)
 		}
 	}
@@ -84,7 +97,11 @@ func main() {
 
 	slices.SortFunc(files, cmp)
 
-	a.printGrid(files)
+	if a.longList {
+		a.printLongList(files)
+	} else {
+		a.printGrid(files)
+	}
 }
 
 func (a *arguments) printGrid(files []os.DirEntry) {
@@ -121,5 +138,82 @@ func (a *arguments) printGrid(files []os.DirEntry) {
 			}
 		}
 		fmt.Print("\n")
+	}
+}
+
+type llFile struct {
+	mode      string
+	hardlinks string
+	username  string
+	groupname string
+	size      string
+	modtime   string
+	name      string
+}
+
+func (a *arguments) printLongList(files []os.DirEntry) {
+	llFiles := []llFile{}
+	maxLink := 0
+	maxSize := 0
+	for _, f := range files {
+		info, err := f.Info()
+		if err != nil {
+			panic(err)
+		}
+		links := uint64(0)
+		size := uint64(0)
+		var username string
+		var groupname string
+		if sys := info.Sys(); sys != nil {
+			if stat, ok := sys.(*syscall.Stat_t); ok {
+				links = uint64(stat.Nlink)
+				size = uint64(stat.Size)
+				uid := strconv.Itoa(int(stat.Uid))
+				gid := strconv.Itoa(int(stat.Gid))
+				u, err := user.LookupId(uid)
+				if err != nil {
+					panic(err)
+				}
+				g, err := user.LookupGroupId(gid)
+				if err != nil {
+					panic(err)
+				}
+				username = u.Username
+				groupname = g.Name
+			}
+		}
+		modtime := formatDate(info.ModTime())
+
+		llf := llFile{info.Mode().String(), strconv.Itoa(int(links)), username, groupname, strconv.Itoa(int(size)), modtime, a.getModdedName(f)}
+		llFiles = append(llFiles, llf)
+
+		linklen := len([]rune(llf.hardlinks))
+		sizelen := len([]rune(llf.size))
+		if linklen > maxLink {
+			maxLink = linklen
+		}
+
+		if sizelen > maxSize {
+			maxSize = sizelen
+		}
+	}
+
+	for _, llf := range llFiles {
+		linklen := len([]rune(llf.hardlinks))
+		sizelen := len([]rune(llf.size))
+
+		linkpad := ""
+		for linklen < maxLink {
+			linkpad += " "
+			linklen++
+		}
+
+		sizepad := ""
+		for sizelen < maxSize {
+			sizepad += " "
+			sizelen++
+		}
+
+		fmt.Printf("%s %s%s %s %s %s%s %s %s\n", llf.mode, linkpad, llf.hardlinks, llf.username, llf.groupname, sizepad, llf.size, llf.modtime, llf.name)
 	}
 }
