@@ -2,7 +2,6 @@ package main
 
 import (
 	"os"
-	"strings"
 
 	"github.com/queueue0/qoreutils/internal/terminal"
 )
@@ -31,7 +30,7 @@ func newColInfo(maxCols int) []colInfo {
 	return cols
 }
 
-func calculateColumns(files []os.DirEntry) (int, []colInfo) {
+func (a *arguments) calculateColumns(files []os.DirEntry) (int, []colInfo) {
 	lenFiles := len(files)
 
 	// Ignoring err
@@ -55,10 +54,7 @@ func calculateColumns(files []os.DirEntry) (int, []colInfo) {
 	cols := newColInfo(maxCols)
 
 	for f, file := range files {
-		nameLen := len([]rune(file.Name())) + 1
-		if strings.Contains(file.Name(), " ") {
-			nameLen += 1
-		}
+		nameLen := a.getModdedNameLen(file) + 1
 
 		for i := 0; i < maxCols; i++ {
 			if cols[i].validLength {

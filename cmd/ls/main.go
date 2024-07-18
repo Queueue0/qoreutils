@@ -2,32 +2,61 @@ package main
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"regexp"
 	"slices"
 	"strings"
+
+	"github.com/queueue0/qoreutils/internal/flag"
 )
 
+type arguments struct {
+	showHidden bool
+	hasQuotes  bool
+}
+
 func main() {
-	args := os.Args[1:]
-	cwd, err := os.Getwd()
-	if err != nil {
-		panic(err)
-	}
+	a := arguments{}
+	flag.BoolFlag("a", &a.showHidden)
+	_ = flag.Parse()
+	args := flag.Args
 
 	var files []os.DirEntry
+	var err error
 	if len(args) == 0 {
+		cwd, err := os.Getwd()
+		if err != nil {
+			panic(err)
+		}
 		files, err = os.ReadDir(cwd)
+		if err != nil {
+			panic(err)
+		}
 	} else {
 		files, err = os.ReadDir(args[0])
+		if err != nil {
+			panic(err)
+		}
+		if err = os.Chdir(args[0]); err != nil {
+			panic(err)
+		}
 	}
-	if err != nil {
-		panic(err)
+
+	cwdfi, err := os.Lstat(".")
+	if err == nil {
+		cwdde := fs.FileInfoToDirEntry(cwdfi)
+		files = append(files, cwdde)
+	}
+
+	parentfi, err := os.Lstat("..")
+	if err == nil {
+		files = append(files, fs.FileInfoToDirEntry(parentfi))
 	}
 
 	tmp := []os.DirEntry{}
 	for _, file := range files {
-		if !strings.HasPrefix(file.Name(), ".") {
+		if a.showHidden || !strings.HasPrefix(file.Name(), ".") {
 			tmp = append(tmp, file)
 		}
 	}
@@ -53,11 +82,11 @@ func main() {
 
 	slices.SortFunc(files, cmp)
 
-	printGrid(files)
+	a.printGrid(files)
 }
 
-func printGrid(files []os.DirEntry) {
-	cols, colInfo := calculateColumns(files)
+func (a *arguments) printGrid(files []os.DirEntry) {
+	cols, colInfo := a.calculateColumns(files)
 	rows := len(files) / cols
 	if len(files)%cols != 0 {
 		rows += 1
@@ -69,16 +98,11 @@ func printGrid(files []os.DirEntry) {
 		fidx := row
 
 		for {
-			nameLen := len([]rune(files[fidx].Name()))
-			if col == 0 {
+			nameLen := a.getModdedNameLen(files[fidx])
+			if a.hasQuotes && col == 0 {
 				fmt.Print(" ")
 			}
-			if strings.Contains(files[fidx].Name(), " ") {
-				nameLen += 1
-				fmt.Printf("\b'%s'", files[fidx].Name())
-			} else {
-				fmt.Printf("%s", files[fidx].Name())
-			}
+			fmt.Print(a.getModdedName(files[fidx]))
 
 			fidx += rows
 			if fidx >= len(files) {
