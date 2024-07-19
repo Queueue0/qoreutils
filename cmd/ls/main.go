@@ -26,9 +26,15 @@ func main() {
 	a := arguments{}
 	flag.BoolFlag("a", &a.showAll)
 	flag.BoolFlag("A", &a.showAlmostAll)
+	flag.BoolFlag("all", &a.showAll)
+	flag.BoolFlag("almost-all", &a.showAlmostAll)
 	flag.BoolFlag("1", &a.oneColumn)
 	flag.BoolFlag("l", &a.longList)
-	_ = flag.Parse()
+	err := flag.Parse()
+	if err != nil {
+		// TODO: print usage instead
+		panic(err)
+	}
 	args := flag.Args
 
 	if a.showAlmostAll && !a.showAll {
@@ -36,7 +42,6 @@ func main() {
 	}
 
 	var files []os.DirEntry
-	var err error
 	if len(args) == 0 {
 		cwd, err := os.Getwd()
 		if err != nil {
